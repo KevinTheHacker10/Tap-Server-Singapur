@@ -11,7 +11,7 @@ interface Product {
   estado: boolean;
   cantidadCritica: number;
   cantidadDisponible: number;
-  category: string; // Cambiado para que coincida con el servidor
+  categoryId: number; // Cambiado para que coincida con el backend
 }
 
 const Productos: React.FC = () => {
@@ -23,7 +23,7 @@ const Productos: React.FC = () => {
     estado: true,
     cantidadCritica: 0,
     cantidadDisponible: 0,
-    category: "",
+    categoryId: 0,
   });
   const [activeOption, setActiveOption] = useState<string>("Agregar");
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
@@ -31,8 +31,10 @@ const Productos: React.FC = () => {
   const [showPopup, setShowPopup] = useState<boolean>(false);
   const [withdrawQuantity, setWithdrawQuantity] = useState<number>(0);
   const [withdrawReason, setWithdrawReason] = useState<string>("");
+  const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
 
-  const API_URL = "http://192.168.0.17:8080/api/products";
+  const API_URL = "http://192.168.0.28:8080/api/products";
+  const CATEGORIES_URL = "http://192.168.0.28:8080/api/categories";
 
   useEffect(() => {
     if (["Consultar", "Salidas de Inventario"].includes(activeOption)) {
@@ -52,7 +54,7 @@ const Productos: React.FC = () => {
         setProducts(
           data.map((product: any) => ({
             ...product,
-            category: product.category || product.categoria,
+            category: product.category || product.category,
           }))
         );
       } else {
@@ -65,10 +67,47 @@ const Productos: React.FC = () => {
     }
   };
 
-  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+// useEffect para cargar categorías al montar el componente
+useEffect(() => {
+  fetchCategories(); // Llama a la función para obtener categorías al inicio
+}, []);
+
+// Función fetchCategories
+const fetchCategories = async () => {
+  try {
+      const response = await fetch("http://192.168.0.28:8080/api/categories");
+      if (response.ok) {
+          const data = await response.json();
+          setCategories(
+              data.map((category: { id: number; name: string }) => ({
+                  id: category.id,
+                  name: category.name,
+              }))
+          );
+      } else {
+          console.error("Error al obtener categorías:", response.status, response.statusText);
+          setPopupMessage(`Error al obtener categorías: ${response.status} ${response.statusText}`);
+          setShowPopup(true);
+      }
+  } catch (error) {
+      console.error("Error de red al obtener categorías:", error.message);
+      setPopupMessage(`Error de red: ${error.message}`);
+      setShowPopup(true);
+  }
+};
+
+
+
+
+
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setNewProduct({ ...newProduct, [name]: value });
+    setNewProduct({
+      ...newProduct,
+      [name]: name === "categoryId" ? parseInt(value) : value,
+    });
   };
+
 
   const handleWithdrawInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -96,7 +135,7 @@ const Productos: React.FC = () => {
         estado: selectedProduct.estado,
         cantidadCritica: selectedProduct.cantidadCritica,
         cantidadDisponible: selectedProduct.cantidadDisponible,
-        category: selectedProduct.category,
+        categoryId: selectedProduct.categoryId,
       });
       setActiveOption("Salidas de Inventario");
     }
@@ -107,7 +146,7 @@ const Productos: React.FC = () => {
       !newProduct.name ||
       !newProduct.description ||
       !newProduct.price ||
-      !newProduct.category ||
+      !newProduct.categoryId ||
       !newProduct.cantidadDisponible
     ) {
       setPopupMessage("Todos los campos son obligatorios.");
@@ -115,20 +154,26 @@ const Productos: React.FC = () => {
       return;
     }
 
-    if (products.some((product) => product.name === newProduct.name)) {
-      setPopupMessage("El producto ya existe en la base de datos.");
-      setShowPopup(true);
-      return;
-    }
-
     try {
+      const productToSend = {
+        id: 0,
+        name: newProduct.name,
+        description: newProduct.description,
+        price: newProduct.price,
+        estado: newProduct.estado ?? true,
+        cantidadCritica: newProduct.cantidadCritica ?? 0,
+        cantidadDisponible: newProduct.cantidadDisponible,
+        categoryId: newProduct.categoryId,
+      };
+
       const response = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newProduct),
+        body: JSON.stringify(productToSend),
       });
 
       if (response.ok) {
+        const data = await response.json();
         setPopupMessage("Producto agregado con éxito.");
         setShowPopup(true);
         fetchProducts();
@@ -139,10 +184,11 @@ const Productos: React.FC = () => {
           estado: true,
           cantidadCritica: 0,
           cantidadDisponible: 0,
-          category: "",
+          categoryId: 0,
         });
       } else {
-        setPopupMessage(`Error al agregar producto: ${response.status}`);
+        const errorData = await response.text();
+        setPopupMessage(`Error al agregar producto: ${errorData}`);
         setShowPopup(true);
       }
     } catch (error) {
@@ -212,7 +258,7 @@ const Productos: React.FC = () => {
       !newProduct.name ||
       !newProduct.description ||
       !newProduct.price ||
-      !newProduct.category ||
+      !newProduct.categoryId ||
       !newProduct.cantidadDisponible
     ) {
       setPopupMessage("Todos los campos son obligatorios para modificar.");
@@ -224,7 +270,10 @@ const Productos: React.FC = () => {
       const response = await fetch(`${API_URL}/${selectedProductId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newProduct),
+        body: JSON.stringify({
+          id: selectedProductId,
+          ...newProduct,
+        }),
       });
 
       if (response.ok) {
@@ -239,10 +288,11 @@ const Productos: React.FC = () => {
           estado: true,
           cantidadCritica: 0,
           cantidadDisponible: 0,
-          category: "",
+          categoryId: 0,
         });
       } else {
-        setPopupMessage(`Error al modificar producto: ${response.status}`);
+        const errorData = await response.text();
+        setPopupMessage(`Error al modificar producto: ${errorData}`);
         setShowPopup(true);
       }
     } catch (error) {
@@ -365,7 +415,7 @@ const Productos: React.FC = () => {
                     <td style={styles.tableCell}>{product.name}</td>
                     <td style={styles.tableCell}>{product.description}</td>
                     <td style={styles.tableCell}>${product.price}</td>
-                    <td style={styles.tableCell}>{product.category}</td>
+                    <td style={styles.tableCell}>{product.categoryId}</td>
                     <td style={styles.tableCell}>{product.cantidadDisponible}</td>
                     <td style={styles.tableCell}>
                       <button
@@ -422,13 +472,20 @@ const Productos: React.FC = () => {
             style={styles.input}
           />
           <label style={styles.label}>Categoría</label>
-          <input
-            type="text"
-            name="categoria"
-            value={newProduct.category || ""}
+          <select
+            name="categoryId"
+            value={newProduct.categoryId || ""}
             onChange={handleInputChange}
             style={styles.input}
-          />
+          >
+            <option value="">Selecciona una categoría</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+
           <label style={styles.label}>Cantidad Disponible</label>
           <input
             type="number"

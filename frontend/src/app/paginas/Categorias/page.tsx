@@ -20,7 +20,7 @@ const Categorias: React.FC = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  const API_URL = 'http://192.168.0.17:8080/api/categories';
+  const API_URL = 'http://192.168.0.28:8080/api/categories';
 
   useEffect(() => {
     fetchCategories();

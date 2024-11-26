@@ -5,8 +5,8 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        source: '/api/:path*', // Todas las rutas que comiencen con /api/
-        destination: 'http://192.168.0.17:8080/api/:path*', // Redirige correctamente al backend
+        source: '/api/:path*', 
+        destination: 'http://192.168.0.28:8080/api/:path*',
       },
     ];
   },
